@@ -1,0 +1,153 @@
+---
+title: "Iris Dataset Analysis"
+author: "Hasan Ali OZKAN"
+date: "11/24/2021"
+output: html_document
+---
+
+### First we include our library into our environments.
+```{r echo=TRUE, message=FALSE, warning=FALSE, ,include=TRUE}
+
+library(ggplot2)
+library(dplyr)
+library(factoextra)
+library(cluster)
+library(datasets)
+library(knitr)
+library(stats)
+library(NbClust)
+```
+
+### Let's call ***iris*** dataset.
+```{r ,include=TRUE,echo=TRUE}
+data(iris)
+kable(head(iris),format="markdown")
+```
+
+### Let's plot  ***sepal width*** vs ***sepal length***, coloring the points according to their ***species***.
+```{r, include=TRUE,echo=TRUE, warning=FALSE,message=FALSE}
+ggplot(iris, mapping = aes(x = iris$Sepal.Width, y = iris$Sepal.Length, color = iris$Species))+
+         geom_point() +
+         labs(title = "Sepal Width Vs Sepal Length",
+              subtitle = "Colored with Species",
+              x = "Sepal Width",
+              y = "Sepal Length",
+              col="Species")
+```
+
+
+
+### ***PCA*** is used for dimensionality reduction.In this case actually we don't need to reduce our dimensions since we have only four dimension. On the other hand maybe we want to reduce the dimensions in order to show our data clearly on plots.
+```{r, include=TRUE,echo=TRUE}
+pca_iris <-  prcomp(iris[1:4],scale =T,center=T)
+summary(pca_iris)
+```
+
+
+
+### As you see above we are so lucky if we want to use only first two components maybe enough for us it is capture about ***95.81%*** variability in the dataset.
+
+
+```{r, include=TRUE,echo=TRUE}
+fviz_pca_ind(pca_iris,geom.ind = "point", pointshape = 21,
+             pointsize = 2, 
+             fill.ind = iris$Species,
+             col.ind = "black", 
+             palette = "jco",
+             addEllipses = TRUE,
+             label = "var",
+             col.var = "black",
+             repel = TRUE,
+             legend.title ="Species")+
+            ggtitle("2D PCA-plot from 4 feature dataset") +
+            theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+
+
+
+
+### From the data-set we know there must be ***3*** species then we specify ***centers=3*** to guarantee that.
+```{r, include=TRUE,echo=TRUE}
+set.seed(102)
+kmeans_clustering <- kmeans(iris[1:4],centers=3,algorithm = "Lloyd")
+cluster <- data.frame(iris,cluster=as.factor(kmeans_clustering$cluster))
+
+for (i in 1:length(kmeans_clustering$cluster)) {
+  if(kmeans_clustering$cluster[i] == 2){
+    kmeans_clustering$cluster[i] <- "setosa"
+  }else if(kmeans_clustering$cluster[i]==1){
+    kmeans_clustering$cluster[i] <- "virginica"
+  }else{
+    kmeans_clustering$cluster[i] <- "versicolor"
+  }
+}
+cluster <- data.frame(iris,cluster=as.factor(kmeans_clustering$cluster))
+kable(cluster,format="markdown")
+```
+
+### When we apply the ***kmeans()*** method to our data-set we saw that the algorithm create three clusters(that's what we want) and tagged cluster as numeric(1 stands for ***virginica***,2 stands for ***setosa***,3 stands for ***versicolor***) Then I transform the number into name of the species.
+
+
+
+```{r,include=TRUE,echo=TRUE} 
+fviz_nbclust(iris[,-5], kmeans, method = "wss") +
+  geom_vline(xintercept = 3, linetype = 3,color="red") + 
+  labs(subtitle = "Elbow Method")
+```
+
+### Yeah as you see above we are lucky ***elbow method*** gives optimal number of clusters is 3 as we expect.
+
+### Let's see the clusters on a plot.
+```{r,include=TRUE,echo=TRUE}
+fviz_cluster(kmeans_clustering, data = iris[,-5],
+             palette = c("red", "green", "blue"),
+             geom = "point",
+             ellipse.type = "convex")
+```
+</br>
+### When we look at the subject, ***Versicolor*** and ***Virginica*** species are intertwined. (We saw this above when we looked at the table)
+
+
+### Let's start hierarchical clustering...
+```{r,include=TRUE,echo=TRUE}
+distances <-  dist(iris[,-5],method = "euclidian")
+hier_clust <- hclust(distances,method = "average")
+hier_clust
+plot(hier_clust)
+
+```
+
+
+### That is our dendogram.
+
+
+### Let's cut our dendogram from the height of 3. Again the hierarchical clustering model tagged cluster as numeric(1 stands for ***virginica***,2 stands for ***setosa***,3 stands for ***versicolor***) Then I transform the number into name of the species.
+
+```{r,include=TRUE,echo=TRUE}
+clust <- cutree(hier_clust,k=3)
+for (i in 1:length(clust)) {
+  if(clust[i] == 1){
+    clust[i] <- "setosa"
+  }else if(clust[i]==2){
+    clust[i] <- "versicolor"
+  }else{
+    clust[i] <- "virginica"
+  }
+}
+
+cluster_hier <- data.frame(iris,clust)
+kable(cluster_hier,format="markdown")
+```
+```{r,include=TRUE,echo=TRUE}
+
+table(kmeans_clustering$cluster,iris$Species)
+```
+
+
+
+```{r,include=TRUE,echo=TRUE}
+
+table(clust,iris$Species)
+```

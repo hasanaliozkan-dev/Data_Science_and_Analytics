@@ -1,0 +1,175 @@
+---
+title: "BREAST CANCER WISCONSIN DATA LOGISTIC REGRESSION ANALYSIS "
+author: "Hasan Ali ÖZKAN"
+date: "10/30/2021"
+output: html_document
+---
+
+#### Data downloaded from [here](https://www.kaggle.com/uciml/breast-cancer-wisconsin-data) (breast cancer wisconsin data-set).
+
+##### First step we should include some library to use in our analysis.
+
+```{r,echo=TRUE,include=TRUE,message=FALSE}
+library(tidyverse)
+library(knitr)
+library(caret)
+library(Amelia)
+```
+
+##### Let's read the data-set.
+
+```{r,echo=TRUE,include=TRUE,message=FALSE,warning=FALSE}
+data <-  as.data.frame(read_csv("breast_cancer_data.csv"))
+
+```
+
+##### Let's see is there any null values in our data-set? 
+
+```{r,echo=TRUE,include=TRUE}
+missmap(data)
+```
+
+##### **OPPS** We have an empty column let's remove it from the data.
+```{r,echo=TRUE,include=TRUE}
+data <- data[c(0:32)]
+```
+
+##### Let's look at our dataset.In order to see comfortably I took to transpose of the table. (Now our columns are rows and rows are columns in below.)  
+
+```{r, include=TRUE,echo=TRUE}
+data_to_show <- t(head(data))
+kable(data_to_show,format="markdown")
+```
+
+##### Then let's look at our data types whether all of them are correct or not? By using ***str*** (structure) function. 
+```{r, include=TRUE,echo=TRUE}
+str(data)
+```
+
+##### As you see above we have a factor variable which is ***diagnosis*** (our dependent variable) but R assumes it is a character. Let's modify it to factor.
+
+```{r,echo=TRUE,include=TRUE}
+data$diagnosis <- as.factor(data$diagnosis)
+```
+##### Let's check to see if it's fixed.
+
+```{r, include=TRUE,echo=TRUE}
+is.factor(data$diagnosis)
+```
+##### Yeap we modify the ***diagnosis*** variable correctly.
+
+
+
+##### Now it's time to look at the correlation between our columns.
+```{r, include=TRUE,echo=TRUE}
+correlations <- cor(data[c(3:32)])
+corrplot::corrplot(correlations,method = "square",tl.cex = 0.6, tl.col = "black")
+```
+
+##### As you see above some of our columns have a strong positive correlation between them.That problem name is ***multicolinearity***. We don't want to see this but before handle this problems let's create a basic logistic regression model.
+
+##### Firstly, we set a seed value to keep randomness always the same.
+```{r, include=TRUE,echo=TRUE}
+
+set.seed(42)
+```
+
+##### Then we split our data into train and test data. 
+```{r, include=TRUE,echo=TRUE}
+sample<- createDataPartition(y= data$diagnosis,p=0.8,list = FALSE)
+
+train_data <- data[sample,]
+test_data <- data[-sample,]
+```
+
+##### Now we are creating our model.
+```{r, include=TRUE,echo=TRUE,warning=TRUE}
+logistic_model <- glm(diagnosis~.,data = train_data,family = "binomial")
+
+```
+##### As you see above we get two warning messages. I researched these issues and found their explanation. [Here ](https://statisticsglobe.com/r-glm-fit-warning-algorithm-not-converge-probabilities), the author explains why these warning messages occur. I will quote a small part: 
+> This depends heavily on the structure of the specific data set you are using. However, I advise to have a look at the pairwise correlations of the variables in your data to see if some of these correlations are unnaturally high.
+It often happens that variables are included to a model by accident. Try to identify these variables and run your model again without these variables until the warning message does not appear anymore.
+
+
+##### Let's see what it can be able to our model?
+
+```{r,echo= TRUE,include=TRUE}
+prob <- predict(logistic_model,newdata=test_data,type="response")
+pred <- ifelse(prob > 0.5,"M","B")
+
+
+confusionMatrix(test_data$diagnosis,as.factor(pred))
+
+
+```
+##### As you see above model accuracy is 96 %. It is avesome but we can increase this ratio by applying PCA(Principal Component Analysis) to our dataset. 
+
+##### Let's do this in one line :)
+```{r, include=TRUE,echo=TRUE}
+pca <- prcomp(train_data[3:32], center = TRUE, scale = TRUE)
+
+summary(pca)
+
+```
+##### When we look at the summary of our pca results the first 6 components enough for us since they are capture about 88.85% variability in the data.
+
+##### Let's look at the result in a plot.
+```{r, include=TRUE,echo=TRUE}
+screeplot(pca, type = "l", npcs = 15, main = "Screeplot of the first 15 PCs")
+abline(h = 1, col="red", lty=5)
+legend("topright", legend=c("Eigenvalue = 1"),
+       col=c("red"), lty=5, cex=0.6)
+```
+
+##### As you see above we have a line which name is ***Eigenvalue*** we can say ***eigenvalue*** is the standart deviation of our PC's and we just take the first 6 PC's which their eigenvalues greater than 1.
+
+##### As in the below graph we can say again the first 6 components are capture about 88.85% variability in the data.
+```{r,include=TRUE,echo=TRUE}
+cumpro <- cumsum(pca$sdev^2 / sum(pca$sdev^2))
+plot(cumpro[0:15], xlab = "PC #", ylab = "Amount of explained variance", main = "Cumulative variance plot")
+abline(v = 6, col="red", lty=5)
+abline(h = 0.88759, col="red", lty=5)
+legend("topleft", legend=c("Cut-off @ PC6"),
+       col=c("red"), lty=5, cex=0.6)
+
+```
+
+##### Now lets look at correlation again.
+```{r,echo=TRUE,include=TRUE}
+correlations <- cor(pca$x[,c(0:6)])
+
+corrplot::corrplot(correlations,method = "square", tl.col = "black")
+
+```
+
+##### As you see above there is no correlation between our PC's.That's what we have wanted.
+
+```{r,echo=TRUE,include=TRUE}
+set.seed(42)
+
+data_pca <- data.frame(diagnosis=train_data[,"diagnosis"],pca$x[,0:6])
+head(data_pca)
+```
+##### Now we can create a more powerful model by using fewer columns.
+```{r,echo=TRUE,include=TRUE,warning=FALSE}
+set.seed(42)
+model_pca <- glm(diagnosis ~ .,data= data_pca,family = binomial)
+
+test_data_pca <- predict(pca,newdata = test_data)
+
+```
+
+##### Let's look at our model's performance metrics.
+```{r,echo=TRUE,include=TRUE}
+
+prob <- predict(model_pca , newdata = data.frame(test_data_pca[,1:6]),type = "response")
+
+pred <- factor(ifelse(prob>0.5,"M","B"))
+
+confusionMatrix(test_data$diagnosis,as.factor(pred))
+
+```
+
+
+##### As you see above our accuracy become 100 %.

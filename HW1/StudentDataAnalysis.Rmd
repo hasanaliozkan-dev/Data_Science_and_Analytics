@@ -1,0 +1,132 @@
+---
+title: "Students Performance Data Analysis"
+author: "Hasan Ali ÖZKAN"
+date: "13/10/2021"
+output: html_document
+---
+
+### This data set consists of the marks secured by the students in various subjects(1000 observations of 8 columns).
+
+
+##### Let's get the data from the **'.csv'** file and look it's first 6 rows.
+
+```{r,echo= TRUE,include=FALSE}
+library(tidyverse)
+```
+
+```{r,,eval=TRUE}
+student_performance <- read.csv("StudentsPerformance.csv",header = TRUE,sep = ',')
+head(student_performance)
+```
+##### ***OOOPS!!?*** Our output is not user friendly. Let's try something to tidy our output.
+
+```{r}
+library(knitr)
+kable(head(student_performance),format="markdown")
+
+```
+##### Let's deep dive into our variables to understand their meaning by calling ***summary()*** function.
+
+```{r,eval=TRUE}
+summary(student_performance)
+```
+
+```{r,echo=FALSE,eval=FALSE}
+print(paste("Class of gender : " , class(student_performance$gender)))
+print(paste("Class of race.ethnicity : " ,class(student_performance$race.ethnicity)))
+print(paste("Class of parental.level.of.education : " ,class(student_performance$parental.level.of.education)))
+print(paste("Class of lunch : " ,class(student_performance$lunch)))
+print(paste("Class of test.preparation.course : " ,class(student_performance$test.preparation.course)))
+print(paste("Class of math.score : " ,class(student_performance$math.score)))
+print(paste("Class of reading.score : " ,class(student_performance$reading.score)))
+print(paste("Class of writing.score : " ,class(student_performance$writing.score)))
+```
+
+##### ***OOOPS!!*** As you see above there are some mistakes classes of our variables. Let's fix them.For example **gender** and **ethnicity** are categorical variable so we should redefine those as a factor. Lets do that:)
+
+```{r,eval=TRUE}
+student_performance$gender <- as.factor(student_performance$gender)
+student_performance$ethnicity <- as.factor(student_performance$ethnicity)
+```
+
+##### If we recall ***summary()*** function. We can see mistakes have gone.
+
+```{r,eval=TRUE,echo=TRUE}
+summary(student_performance)
+```
+
+##### Let's add another variable in our data to keep an average of all scores for each student by using ***mutate()*** function.
+
+```{r,echo=TRUE,eval=TRUE,results="hide"}
+student_performance <- mutate(student_performance,
+       avg.score= (math.score+reading.score+writing.score)/3)
+```
+
+```{r,echo=TRUE}
+kable(head(student_performance),format="markdown")
+```
+
+##### As you see above **avg.score** variable has been added.Let's choose the ***TOP-10*** students in our data by using their average scores.
+
+```{r,echo=TRUE,eval=TRUE}
+top10_students <-head(arrange(student_performance,desc(avg.score)),10)
+kable(select(top10_students,gender:parental.level.of.edu,test.prep.course,avg.score),format="markdown")
+```
+
+##### As you see above there are some students who are in the ***TOP-10*** but they are not complete test-preparation-course.Let's try to filter them then select the ***TOP-10*** student.
+
+```{r,eval=TRUE,echo=TRUE}
+prep_course_completed_students <- filter(student_performance,test.prep.course=="completed")
+prep_course_completed_students_top10 <- head(arrange(prep_course_completed_students,desc(avg.score)),10)
+kable(select(prep_course_completed_students_top10,gender:parental.level.of.edu,test.prep.course,avg.score),format="markdown")
+```
+
+##### Finally, let's make up a threshold value to pass the class.Let's assume that another criterion is to pass the preparatory course test and call the threshold value 60 and see how many of the students passed the class :)
+
+```{r,echo=TRUE,eval=TRUE}
+prep_course_completed_students <- filter(student_performance,test.prep.course=="completed")
+passed_students <- filter(prep_course_completed_students,avg.score>=60)
+number_of_passed_students <- count(passed_students)
+print(paste("The number of students who passed the class is ",number_of_passed_students))
+```
+
+##### ***Wow that's great!!!*** Almost one-third of the students passed the class:)
+
+##### Finally, let's visualize our data with some meaningful and clear graphics.
+
+##### Just I want to look for is there any correlation between ***math.score*** and other scores.Let's create a scatter plot to understand that.
+
+```{r,echo=TRUE,eval=TRUE}
+
+math_reading <- ggplot(student_performance)+
+  geom_point(mapping = aes(x=reading.score,y=math.score))+
+  labs(title="MATH vs READING",
+       y="Math Score",x="Reading Score")+theme_classic()
+
+
+math_writing <- ggplot(student_performance)+
+  geom_point(mapping = aes(x=writing.score,y=math.score))+
+  labs(title="MATH vs WRITING",
+       y="Math Score",x="Writing Score")+theme_classic()
+
+
+figure <- ggpubr::ggarrange(math_reading,math_writing,ncol=2,nrow=1)
+figure
+```
+
+##### As you see above there is a positive correlation between **math.scores** and other scores. 
+
+
+
+##### Let's look is **ethnicity** important to be successful?
+
+```{r,echo=TRUE,eval=TRUE}
+ggplot(student_performance) + 
+  geom_boxplot(mapping = aes(x = ethnicity, y =avg.score))+
+  coord_cartesian(ylim = c(0,100))+
+  labs(title="ETHNICITY vs AVERAGE SCORE",
+       x="Ethnicity",y="Average Score")+
+   theme_classic()
+```
+
+##### As you see above the boxplot is showing everything. Each group plot's median is close to each other but of course, there are some outliers.
